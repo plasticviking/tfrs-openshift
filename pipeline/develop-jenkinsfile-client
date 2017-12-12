@@ -56,11 +56,3 @@ stage('deploy-test') {
     }
 }
 
-stage('deploy-prod') {
-    input "Deploy to Prod?"
-    node('maven') {
-        openshiftTag destStream: 'client', verbose: 'true', destTag: 'prod', srcStream: 'client', srcTag: '$BUILD_ID'
-    }
-}
-
-
