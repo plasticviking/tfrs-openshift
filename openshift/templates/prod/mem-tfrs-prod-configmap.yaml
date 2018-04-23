@@ -1,5 +1,25 @@
 apiVersion: v1
-items: []
+items:
+- apiVersion: v1
+  data:
+    reques_logger.py: |-
+      from flask import Flask, request
+      app = Flask(__name__)
+
+      @app.route('/', defaults={'path': ''})
+      @app.route('/<path:path>')
+      def dump_headers(path):
+        #print('{}\n\n'.format(request.method + ' ' + request.url))
+        #print(request.headers)
+        return '{}\n\nHEADERS:\n{}'.format(request.method + ' ' + request.url, str(request.headers)), 200, {'Content-Type': 'text/plain; charset=utf-8'}
+  kind: ConfigMap
+  metadata:
+    creationTimestamp: 2018-04-19T21:14:34Z
+    name: reques-logger
+    namespace: mem-tfrs-prod
+    resourceVersion: "429047311"
+    selfLink: /api/v1/namespaces/mem-tfrs-prod/configmaps/reques-logger
+    uid: a8acd79c-4416-11e8-9a98-0050568348cc
 kind: List
 metadata: {}
 resourceVersion: ""

@@ -5,6 +5,22 @@ metadata:
   name: mem-tfrs-prod
 objects:
 - apiVersion: v1
+  data:
+    reques_logger.py: |-
+      from flask import Flask, request
+      app = Flask(__name__)
+
+      @app.route('/', defaults={'path': ''})
+      @app.route('/<path:path>')
+      def dump_headers(path):
+        #print('{}\n\n'.format(request.method + ' ' + request.url))
+        #print(request.headers)
+        return '{}\n\nHEADERS:\n{}'.format(request.method + ' ' + request.url, str(request.headers)), 200, {'Content-Type': 'text/plain; charset=utf-8'}
+  kind: ConfigMap
+  metadata:
+    creationTimestamp: null
+    name: reques-logger
+- apiVersion: v1
   groupNames: null
   kind: RoleBinding
   metadata:
@@ -21,11 +37,14 @@ objects:
     name: kuanfandevops
   - kind: User
     name: cvarjao
+  - kind: User
+    name: matthewhall78
   userNames:
   - sheaphillips
   - rajpersram
   - kuanfandevops
   - cvarjao
+  - matthewhall78
 - apiVersion: v1
   groupNames: null
   kind: RoleBinding
@@ -113,12 +132,27 @@ objects:
     name: view
   subjects:
   - kind: User
-    name: matthewhall78
-  - kind: User
     name: swcurran
   userNames:
-  - matthewhall78
   - swcurran
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    annotations:
+      pv.kubernetes.io/bind-completed: "yes"
+      pv.kubernetes.io/bound-by-controller: "yes"
+      volume.beta.kubernetes.io/storage-class: gluster-file
+      volume.beta.kubernetes.io/storage-provisioner: kubernetes.io/glusterfs
+    creationTimestamp: null
+    name: postgresql-backup-cns
+  spec:
+    accessModes:
+    - ReadWriteMany
+    resources:
+      requests:
+        storage: 10Gi
+    volumeName: pvc-f13db0c2-471a-11e8-8974-0050568348cc
+  status: {}
 - apiVersion: v1
   kind: PersistentVolumeClaim
   metadata:
@@ -138,6 +172,42 @@ objects:
     volumeName: pvc-ca0e197f-0094-11e8-b783-0050568379a2
   status: {}
 - apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    annotations:
+      openshift.io/generated-by: OpenShiftWebConsole
+    creationTimestamp: null
+    labels:
+      app: request-logger
+    name: request-logger
+  spec:
+    failedBuildsHistoryLimit: 5
+    nodeSelector: null
+    output:
+      to:
+        kind: ImageStreamTag
+        name: request-logger:latest
+    postCommit: {}
+    resources: {}
+    runPolicy: Serial
+    source:
+      contextDir: /utils/request_logger
+      git:
+        ref: master
+        uri: https://github.com/bcdevops/openshift-tools/
+      type: Git
+    strategy:
+      sourceStrategy:
+        from:
+          kind: ImageStreamTag
+          name: python:3.5
+          namespace: openshift
+      type: Source
+    successfulBuildsHistoryLimit: 5
+    triggers: []
+  status:
+    lastVersion: 0
+- apiVersion: v1
   kind: DeploymentConfig
   metadata:
     annotations:
@@ -151,14 +221,10 @@ objects:
       name: client
     strategy:
       activeDeadlineSeconds: 21600
-      resources: {}
-      rollingParams:
-        intervalSeconds: 1
-        maxSurge: 25%
-        maxUnavailable: 25%
+      recreateParams:
         timeoutSeconds: 600
-        updatePeriodSeconds: 1
-      type: Rolling
+      resources: {}
+      type: Recreate
     template:
       metadata:
         creationTimestamp: null
@@ -176,7 +242,7 @@ objects:
           - name: HTTP_BASIC
           - name: API_URL
             value: http://backend.mem-tfrs-prod.svc.cluster.local:8080/api/
-          image: 172.50.0.2:5000/mem-tfrs-tools/client@sha256:0e75d94f2ed0f2cec0d9a1675c069667e9af2f233e0e45babb4adf47d52a3d7d
+          image: 172.50.0.2:5000/mem-tfrs-tools/client@sha256:4da7ec032027f2ef07ac088b347a65072e06bc8b57a5af97f1112c93617bb8bc
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 3
@@ -204,7 +270,11 @@ objects:
             timeoutSeconds: 3
           resources:
             limits:
-              memory: 1Gi
+              cpu: "1"
+              memory: 4Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
         dnsPolicy: ClusterFirst
@@ -241,6 +311,7 @@ objects:
       template: postgresql-persistent-template
     name: postgresql
   spec:
+    paused: true
     replicas: 1
     selector:
       name: postgresql
@@ -299,7 +370,10 @@ objects:
             timeoutSeconds: 1
           resources:
             limits:
-              memory: 512Mi
+              memory: 4Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
           securityContext:
             capabilities: {}
             privileged: false
@@ -308,6 +382,8 @@ objects:
           volumeMounts:
           - mountPath: /var/lib/pgsql/data
             name: postgresql-data
+          - mountPath: /postgresql-backup
+            name: volume-iwx0w
         dnsPolicy: ClusterFirst
         restartPolicy: Always
         schedulerName: default-scheduler
@@ -317,6 +393,9 @@ objects:
         - name: postgresql-data
           persistentVolumeClaim:
             claimName: postgresql-cns
+        - name: volume-iwx0w
+          persistentVolumeClaim:
+            claimName: postgresql-backup-cns
     test: false
     triggers:
     - imageChangeParams:
@@ -340,14 +419,17 @@ objects:
   kind: DeploymentConfig
   metadata:
     annotations:
-      description: Defines how to deploy the container.
+      openshift.io/generated-by: OpenShiftWebConsole
     creationTimestamp: null
     generation: 1
-    name: schema-spy
+    labels:
+      app: request-logger
+    name: request-logger
   spec:
     replicas: 1
+    revisionHistoryLimit: 10
     selector:
-      name: schema-spy
+      deploymentconfig: request-logger
     strategy:
       activeDeadlineSeconds: 21600
       resources: {}
@@ -358,6 +440,79 @@ objects:
         timeoutSeconds: 600
         updatePeriodSeconds: 1
       type: Rolling
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: request-logger
+          deploymentconfig: request-logger
+      spec:
+        containers:
+        - image: 172.50.0.2:5000/mem-tfrs-tools/request-logger@sha256:bd2071b048447812c46073e247953b7747240033765e60c9ebf3604060566403
+          imagePullPolicy: Always
+          name: request-logger
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+          resources:
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /opt/app-root/src
+            name: volume-8g9sa
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - configMap:
+            defaultMode: 420
+            items:
+            - key: reques_logger.py
+              path: request_logger.py
+            name: reques-logger
+          name: volume-8g9sa
+    test: false
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - request-logger
+        from:
+          kind: ImageStreamTag
+          name: request-logger:latest
+          namespace: mem-tfrs-tools
+      type: ImageChange
+    - type: ConfigChange
+  status:
+    availableReplicas: 0
+    latestVersion: 0
+    observedGeneration: 0
+    replicas: 0
+    unavailableReplicas: 0
+    updatedReplicas: 0
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    annotations:
+      description: Defines how to deploy the container.
+    creationTimestamp: null
+    generation: 1
+    name: schema-spy
+  spec:
+    replicas: 1
+    selector:
+      name: schema-spy
+    strategy:
+      activeDeadlineSeconds: 21600
+      recreateParams:
+        timeoutSeconds: 600
+      resources: {}
+      type: Recreate
     template:
       metadata:
         creationTimestamp: null
@@ -409,7 +564,10 @@ objects:
             timeoutSeconds: 3000
           resources:
             limits:
+              cpu: 500m
               memory: 512Mi
+            requests:
+              memory: 256Mi
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
         dnsPolicy: ClusterFirst
@@ -480,6 +638,7 @@ objects:
           - name: DATABASE_NAME
             value: tfrs
           - name: APP_CONFIG
+            value: /opt/app-root/src/gunicorn.cfg
           - name: DATABASE_USER
             valueFrom:
               secretKeyRef:
@@ -490,7 +649,7 @@ objects:
               secretKeyRef:
                 key: DATABASE_PASSWORD
                 name: tfrs-postgresql
-          image: 172.50.0.2:5000/mem-tfrs-tools/tfrs@sha256:7bfe24a5a4ede5f301e0a94586f1a9a6abcea33d5162e9362effb3bf66df68dc
+          image: 172.50.0.2:5000/mem-tfrs-tools/tfrs@sha256:0618d56334a7ae915f0156d61a96f350115f134ed5504a9e24e9eed064758847
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 3
@@ -512,13 +671,17 @@ objects:
               path: /health
               port: 8080
               scheme: HTTP
-            initialDelaySeconds: 3
+            initialDelaySeconds: 30
             periodSeconds: 10
             successThreshold: 1
             timeoutSeconds: 3
           resources:
             limits:
-              memory: 512Mi
+              cpu: "1"
+              memory: 4Gi
+            requests:
+              cpu: 100m
+              memory: 256Mi
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
         dnsPolicy: ClusterFirst
@@ -607,6 +770,22 @@ objects:
   metadata:
     creationTimestamp: null
     labels:
+      gluster.kubernetes.io/provisioned-for-pvc: postgresql-backup-cns
+    name: glusterfs-dynamic-postgresql-backup-cns
+  spec:
+    ports:
+    - port: 1
+      protocol: TCP
+      targetPort: 1
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    labels:
       gluster.kubernetes.io/provisioned-for-pvc: postgresql-cns
     name: glusterfs-dynamic-postgresql-cns
   spec:
@@ -641,6 +820,25 @@ objects:
 - apiVersion: v1
   kind: Service
   metadata:
+    creationTimestamp: null
+    labels:
+      app: request-logger
+    name: request-logger
+  spec:
+    ports:
+    - name: 8080-8080
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      app: request-logger
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
     annotations:
       description: Exposes and load balances the application pods
     creationTimestamp: null
@@ -661,12 +859,81 @@ objects:
   kind: Route
   metadata:
     creationTimestamp: null
+    labels:
+      template: tfrs-app-environment
     name: api
   spec:
-    host: lowcarbonfuels.pathfinder.bcgov
+    host: prod-lowcarbonfuels.pathfinder.bcgov
     path: /api
     port:
       targetPort: web
+    tls:
+      certificate: |
+        -----BEGIN CERTIFICATE-----
+        MIIEoTCCAy0CCQChZjkgDBrgvzANBgkqhkiG9w0BAQUFADCBtTELMAkGA1UEBhMC
+        Q0ExGTAXBgNVBAgMEEJyaXRpc2ggQ29sdW1iaWExETAPBgNVBAcMCFZpY3Rvcmlh
+        MTcwNQYDVQQKDC5Hb3Zlcm5tZW50IG9mIHRoZSBQcm92aW5jZSBvZiBCcml0aXNo
+        IENvbHVtYmlhMRAwDgYDVQQLDAdGTE5ST1JEMS0wKwYDVQQDDCRwcm9kLWxvd2Nh
+        cmJvbmZ1ZWxzLnBhdGhmaW5kZXIuYmNnb3YwIBcNMTgwMzE2MTY1NTA0WhgPMjEx
+        ODAyMjAxNjU1MDRaMIG1MQswCQYDVQQGEwJDQTEZMBcGA1UECAwQQnJpdGlzaCBD
+        b2x1bWJpYTERMA8GA1UEBwwIVmljdG9yaWExNzA1BgNVBAoMLkdvdmVybm1lbnQg
+        b2YgdGhlIFByb3ZpbmNlIG9mIEJyaXRpc2ggQ29sdW1iaWExEDAOBgNVBAsMB0ZM
+        TlJPUkQxLTArBgNVBAMMJHByb2QtbG93Y2FyYm9uZnVlbHMucGF0aGZpbmRlci5i
+        Y2dvdjCCAX0wDQYJKoZIhvcNAQEBBQADggFqADCCAWUCggFcAXJnPZefF2EbJbeQ
+        iswOlnOyV6RYUkccrTKmYxXigocHzkoKrDWwjxKEAh/D7+kZ+f4w9fAsaa0Wb2lv
+        0cLaxq/fYh5o57OIslrdwh8ik6+wKKwqzj0KDGQmCodIP8MXJ+KWLCKjpMYoOcA0
+        ABzUzlzz3EuxLljbBXNDAzElcOv9I0mt0B7daJjHnprEA8PWsnN6Vql02AOUDLzs
+        byc/fmP41plEioBy2ZuAaGKMAN2ZH3a+pPU2yT7CMDvnsCU2S3H53T3lwLl+5scZ
+        bV+riXF1gT+2Dhdn1Isn0cj5zsv1SuMk9W9D0sjgaTgylGdn4i8XrdKx0K0Di8O4
+        f54xVD8/SufZoclYHe8DcRKHGwaK/mN2L8ubk3wxqfox430dLOPdXRfD51Uorkgk
+        M+7X9abH50w16I9jxZmvZCMReNPtTECxlhTixBB3zwfTdE8u95Ug72mzjTUq62nR
+        AgMBAAEwDQYJKoZIhvcNAQEFBQADggFdAAERlcUuwpcCtxd3POVeUZaTYUGToo98
+        hxcFJ59o3tCgpiKmulW4yWtyQGAQvcd5Tz+3Nu7DFsKEtjFgkgy4MnazOAK8x9Nj
+        usW3eIDazgz6d0KHKApwHq74MVk0kuJk/3J9I7fhNj2FeKmahipnraSmzlYb8nIW
+        h9oLXrJE8zJNdmtwS11VuKb2cqNzSfUi4uNH7nM/N4OQaRqJJuvfOasQ2qLoKpVE
+        zLJHS3nSMyPCJ6pqFoP04r1x3CiF69MaVBGp61Vg+4+VoneTpEGEdPSuds7C2/Ya
+        i5XZ1ReN6U+Cd4hstByIhJdOGUD2EfoAWJZrmv+P9+70uNj9DPk9Hvb03DB+J3m4
+        3oGpgq1x06/NI/ZG/uUIRx+m4psPyb4NI3sahuswqEk+DXRT8mdecOUW/l5MLdHl
+        dXCXsu9wAYnLUk8zckyQsrjJTjlKBagE6rCt2XjzhWe4nIqSwg==
+        -----END CERTIFICATE-----
+      key: |
+        -----BEGIN RSA PRIVATE KEY-----
+        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
+        yjxNFxKqwrYc+P8UIdiXFw==
+        -----END RSA PRIVATE KEY-----
+      termination: edge
     to:
       kind: Service
       name: backend
@@ -675,21 +942,90 @@ objects:
   status:
     ingress:
     - conditions:
-      - lastTransitionTime: 2018-02-01T00:17:50Z
+      - lastTransitionTime: 2018-04-19T20:42:44Z
         status: "True"
         type: Admitted
-      host: lowcarbonfuels.pathfinder.bcgov
+      host: prod-lowcarbonfuels.pathfinder.bcgov
       routerName: router
       wildcardPolicy: None
 - apiVersion: v1
   kind: Route
   metadata:
     creationTimestamp: null
+    labels:
+      template: tfrs-app-environment
     name: main
   spec:
-    host: lowcarbonfuels.pathfinder.bcgov
+    host: prod-lowcarbonfuels.pathfinder.bcgov
     port:
       targetPort: web
+    tls:
+      certificate: |
+        -----BEGIN CERTIFICATE-----
+        MIIEoTCCAy0CCQChZjkgDBrgvzANBgkqhkiG9w0BAQUFADCBtTELMAkGA1UEBhMC
+        Q0ExGTAXBgNVBAgMEEJyaXRpc2ggQ29sdW1iaWExETAPBgNVBAcMCFZpY3Rvcmlh
+        MTcwNQYDVQQKDC5Hb3Zlcm5tZW50IG9mIHRoZSBQcm92aW5jZSBvZiBCcml0aXNo
+        IENvbHVtYmlhMRAwDgYDVQQLDAdGTE5ST1JEMS0wKwYDVQQDDCRwcm9kLWxvd2Nh
+        cmJvbmZ1ZWxzLnBhdGhmaW5kZXIuYmNnb3YwIBcNMTgwMzE2MTY1NTA0WhgPMjEx
+        ODAyMjAxNjU1MDRaMIG1MQswCQYDVQQGEwJDQTEZMBcGA1UECAwQQnJpdGlzaCBD
+        b2x1bWJpYTERMA8GA1UEBwwIVmljdG9yaWExNzA1BgNVBAoMLkdvdmVybm1lbnQg
+        b2YgdGhlIFByb3ZpbmNlIG9mIEJyaXRpc2ggQ29sdW1iaWExEDAOBgNVBAsMB0ZM
+        TlJPUkQxLTArBgNVBAMMJHByb2QtbG93Y2FyYm9uZnVlbHMucGF0aGZpbmRlci5i
+        Y2dvdjCCAX0wDQYJKoZIhvcNAQEBBQADggFqADCCAWUCggFcAXJnPZefF2EbJbeQ
+        iswOlnOyV6RYUkccrTKmYxXigocHzkoKrDWwjxKEAh/D7+kZ+f4w9fAsaa0Wb2lv
+        0cLaxq/fYh5o57OIslrdwh8ik6+wKKwqzj0KDGQmCodIP8MXJ+KWLCKjpMYoOcA0
+        ABzUzlzz3EuxLljbBXNDAzElcOv9I0mt0B7daJjHnprEA8PWsnN6Vql02AOUDLzs
+        byc/fmP41plEioBy2ZuAaGKMAN2ZH3a+pPU2yT7CMDvnsCU2S3H53T3lwLl+5scZ
+        bV+riXF1gT+2Dhdn1Isn0cj5zsv1SuMk9W9D0sjgaTgylGdn4i8XrdKx0K0Di8O4
+        f54xVD8/SufZoclYHe8DcRKHGwaK/mN2L8ubk3wxqfox430dLOPdXRfD51Uorkgk
+        M+7X9abH50w16I9jxZmvZCMReNPtTECxlhTixBB3zwfTdE8u95Ug72mzjTUq62nR
+        AgMBAAEwDQYJKoZIhvcNAQEFBQADggFdAAERlcUuwpcCtxd3POVeUZaTYUGToo98
+        hxcFJ59o3tCgpiKmulW4yWtyQGAQvcd5Tz+3Nu7DFsKEtjFgkgy4MnazOAK8x9Nj
+        usW3eIDazgz6d0KHKApwHq74MVk0kuJk/3J9I7fhNj2FeKmahipnraSmzlYb8nIW
+        h9oLXrJE8zJNdmtwS11VuKb2cqNzSfUi4uNH7nM/N4OQaRqJJuvfOasQ2qLoKpVE
+        zLJHS3nSMyPCJ6pqFoP04r1x3CiF69MaVBGp61Vg+4+VoneTpEGEdPSuds7C2/Ya
+        i5XZ1ReN6U+Cd4hstByIhJdOGUD2EfoAWJZrmv+P9+70uNj9DPk9Hvb03DB+J3m4
+        3oGpgq1x06/NI/ZG/uUIRx+m4psPyb4NI3sahuswqEk+DXRT8mdecOUW/l5MLdHl
+        dXCXsu9wAYnLUk8zckyQsrjJTjlKBagE6rCt2XjzhWe4nIqSwg==
+        -----END CERTIFICATE-----
+      key: |
+        -----BEGIN RSA PRIVATE KEY-----
+        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
+        yjxNFxKqwrYc+P8UIdiXFw==
+        -----END RSA PRIVATE KEY-----
+      termination: edge
     to:
       kind: Service
       name: client
@@ -698,10 +1034,10 @@ objects:
   status:
     ingress:
     - conditions:
-      - lastTransitionTime: 2018-02-01T00:18:13Z
+      - lastTransitionTime: 2018-04-19T20:41:58Z
         status: "True"
         type: Admitted
-      host: lowcarbonfuels.pathfinder.bcgov
+      host: prod-lowcarbonfuels.pathfinder.bcgov
       routerName: router
       wildcardPolicy: None
 - apiVersion: v1
@@ -723,5 +1059,99 @@ objects:
         status: "True"
         type: Admitted
       host: schema-spy-mem-tfrs-prod.pathfinder.gov.bc.ca
+      routerName: router
+      wildcardPolicy: None
+- apiVersion: v1
+  kind: Route
+  metadata:
+    creationTimestamp: null
+    labels:
+      app: request-logger
+    name: sminfo
+  spec:
+    host: prod-lowcarbonfuels.pathfinder.bcgov
+    path: /sminfo
+    port:
+      targetPort: 8080-8080
+    tls:
+      certificate: |
+        -----BEGIN CERTIFICATE-----
+        MIIEoTCCAy0CCQChZjkgDBrgvzANBgkqhkiG9w0BAQUFADCBtTELMAkGA1UEBhMC
+        Q0ExGTAXBgNVBAgMEEJyaXRpc2ggQ29sdW1iaWExETAPBgNVBAcMCFZpY3Rvcmlh
+        MTcwNQYDVQQKDC5Hb3Zlcm5tZW50IG9mIHRoZSBQcm92aW5jZSBvZiBCcml0aXNo
+        IENvbHVtYmlhMRAwDgYDVQQLDAdGTE5ST1JEMS0wKwYDVQQDDCRwcm9kLWxvd2Nh
+        cmJvbmZ1ZWxzLnBhdGhmaW5kZXIuYmNnb3YwIBcNMTgwMzE2MTY1NTA0WhgPMjEx
+        ODAyMjAxNjU1MDRaMIG1MQswCQYDVQQGEwJDQTEZMBcGA1UECAwQQnJpdGlzaCBD
+        b2x1bWJpYTERMA8GA1UEBwwIVmljdG9yaWExNzA1BgNVBAoMLkdvdmVybm1lbnQg
+        b2YgdGhlIFByb3ZpbmNlIG9mIEJyaXRpc2ggQ29sdW1iaWExEDAOBgNVBAsMB0ZM
+        TlJPUkQxLTArBgNVBAMMJHByb2QtbG93Y2FyYm9uZnVlbHMucGF0aGZpbmRlci5i
+        Y2dvdjCCAX0wDQYJKoZIhvcNAQEBBQADggFqADCCAWUCggFcAXJnPZefF2EbJbeQ
+        iswOlnOyV6RYUkccrTKmYxXigocHzkoKrDWwjxKEAh/D7+kZ+f4w9fAsaa0Wb2lv
+        0cLaxq/fYh5o57OIslrdwh8ik6+wKKwqzj0KDGQmCodIP8MXJ+KWLCKjpMYoOcA0
+        ABzUzlzz3EuxLljbBXNDAzElcOv9I0mt0B7daJjHnprEA8PWsnN6Vql02AOUDLzs
+        byc/fmP41plEioBy2ZuAaGKMAN2ZH3a+pPU2yT7CMDvnsCU2S3H53T3lwLl+5scZ
+        bV+riXF1gT+2Dhdn1Isn0cj5zsv1SuMk9W9D0sjgaTgylGdn4i8XrdKx0K0Di8O4
+        f54xVD8/SufZoclYHe8DcRKHGwaK/mN2L8ubk3wxqfox430dLOPdXRfD51Uorkgk
+        M+7X9abH50w16I9jxZmvZCMReNPtTECxlhTixBB3zwfTdE8u95Ug72mzjTUq62nR
+        AgMBAAEwDQYJKoZIhvcNAQEFBQADggFdAAERlcUuwpcCtxd3POVeUZaTYUGToo98
+        hxcFJ59o3tCgpiKmulW4yWtyQGAQvcd5Tz+3Nu7DFsKEtjFgkgy4MnazOAK8x9Nj
+        usW3eIDazgz6d0KHKApwHq74MVk0kuJk/3J9I7fhNj2FeKmahipnraSmzlYb8nIW
+        h9oLXrJE8zJNdmtwS11VuKb2cqNzSfUi4uNH7nM/N4OQaRqJJuvfOasQ2qLoKpVE
+        zLJHS3nSMyPCJ6pqFoP04r1x3CiF69MaVBGp61Vg+4+VoneTpEGEdPSuds7C2/Ya
+        i5XZ1ReN6U+Cd4hstByIhJdOGUD2EfoAWJZrmv+P9+70uNj9DPk9Hvb03DB+J3m4
+        3oGpgq1x06/NI/ZG/uUIRx+m4psPyb4NI3sahuswqEk+DXRT8mdecOUW/l5MLdHl
+        dXCXsu9wAYnLUk8zckyQsrjJTjlKBagE6rCt2XjzhWe4nIqSwg==
+        -----END CERTIFICATE-----
+      insecureEdgeTerminationPolicy: Allow
+      key: |
+        -----BEGIN RSA PRIVATE KEY-----
+        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
+        yjxNFxKqwrYc+P8UIdiXFw==
+        -----END RSA PRIVATE KEY-----
+      termination: edge
+    to:
+      kind: Service
+      name: request-logger
+      weight: 100
+    wildcardPolicy: None
+  status:
+    ingress:
+    - conditions:
+      - lastTransitionTime: 2018-04-20T15:42:44Z
+        status: "True"
+        type: Admitted
+      host: prod-lowcarbonfuels.pathfinder.bcgov
       routerName: router
       wildcardPolicy: None

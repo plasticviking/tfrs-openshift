@@ -7,7 +7,7 @@ items:
     creationTimestamp: 2017-11-21T23:45:52Z
     name: admin
     namespace: mem-tfrs-prod
-    resourceVersion: "355762951"
+    resourceVersion: "401481991"
     selfLink: /oapi/v1/namespaces/mem-tfrs-prod/rolebindings/admin
     uid: 1bcf7359-cf16-11e7-8fdb-0050568348cc
   roleRef:
@@ -21,11 +21,14 @@ items:
     name: kuanfandevops
   - kind: User
     name: cvarjao
+  - kind: User
+    name: matthewhall78
   userNames:
   - sheaphillips
   - rajpersram
   - kuanfandevops
   - cvarjao
+  - matthewhall78
 - apiVersion: v1
   groupNames: null
   kind: RoleBinding
@@ -126,18 +129,15 @@ items:
     creationTimestamp: 2017-11-21T23:45:52Z
     name: view
     namespace: mem-tfrs-prod
-    resourceVersion: "355762964"
+    resourceVersion: "401482119"
     selfLink: /oapi/v1/namespaces/mem-tfrs-prod/rolebindings/view
     uid: 1bcb8819-cf16-11e7-8fdb-0050568348cc
   roleRef:
     name: view
   subjects:
   - kind: User
-    name: matthewhall78
-  - kind: User
     name: swcurran
   userNames:
-  - matthewhall78
   - swcurran
 kind: List
 metadata: {}

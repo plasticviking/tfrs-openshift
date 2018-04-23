@@ -8,6 +8,33 @@ items:
       pv.kubernetes.io/bound-by-controller: "yes"
       volume.beta.kubernetes.io/storage-class: gluster-file
       volume.beta.kubernetes.io/storage-provisioner: kubernetes.io/glusterfs
+    creationTimestamp: 2018-04-09T21:42:49Z
+    name: postgresql-backup-cns
+    namespace: mem-tfrs-test
+    resourceVersion: "412977794"
+    selfLink: /api/v1/namespaces/mem-tfrs-test/persistentvolumeclaims/postgresql-backup-cns
+    uid: f2d7dc8e-3c3e-11e8-9a98-0050568348cc
+  spec:
+    accessModes:
+    - ReadWriteMany
+    resources:
+      requests:
+        storage: 5Gi
+    volumeName: pvc-f2d7dc8e-3c3e-11e8-9a98-0050568348cc
+  status:
+    accessModes:
+    - ReadWriteMany
+    capacity:
+      storage: 5Gi
+    phase: Bound
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    annotations:
+      pv.kubernetes.io/bind-completed: "yes"
+      pv.kubernetes.io/bound-by-controller: "yes"
+      volume.beta.kubernetes.io/storage-class: gluster-file
+      volume.beta.kubernetes.io/storage-provisioner: kubernetes.io/glusterfs
     creationTimestamp: 2018-01-23T18:11:51Z
     name: postgresql-cns
     namespace: mem-tfrs-test

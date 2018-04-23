@@ -7,7 +7,7 @@ items:
     creationTimestamp: 2017-11-21T23:45:38Z
     name: admin
     namespace: mem-tfrs-dev
-    resourceVersion: "355762944"
+    resourceVersion: "369207718"
     selfLink: /oapi/v1/namespaces/mem-tfrs-dev/rolebindings/admin
     uid: 13df6ae8-cf16-11e7-8fdb-0050568348cc
   roleRef:
@@ -21,11 +21,14 @@ items:
     name: kuanfandevops
   - kind: User
     name: cvarjao
+  - kind: User
+    name: amichard
   userNames:
   - sheaphillips
   - rajpersram
   - kuanfandevops
   - cvarjao
+  - amichard
 - apiVersion: v1
   groupNames: null
   kind: RoleBinding

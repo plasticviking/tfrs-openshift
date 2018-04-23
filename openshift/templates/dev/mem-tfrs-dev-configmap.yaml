@@ -26,18 +26,24 @@ items:
     uid: a5918f8d-d53d-11e7-9f70-005056832285
 - apiVersion: v1
   data:
-    reques_logger.py: "from flask import Flask, request\napp = Flask(__name__)\n\n@app.route('/',
-      defaults={'path': ''})\n@app.route('/<path:path>')\ndef dump_headers(path):\n
-      \ print(request.headers)\n  return str(request.headers), 200, {'Content-Type':
-      'text/plain; charset=utf-8'}\n  "
+    reques_logger.py: |-
+      from flask import Flask, request
+      app = Flask(__name__)
+
+      @app.route('/', defaults={'path': ''})
+      @app.route('/<path:path>')
+      def dump_headers(path):
+        #print('{}\n\n'.format(request.method + ' ' + request.url))
+        #print(request.headers)
+        return '{}\n\nHEADERS:\n{}'.format(request.method + ' ' + request.url, str(request.headers)), 200, {'Content-Type': 'text/plain; charset=utf-8'}
   kind: ConfigMap
   metadata:
-    creationTimestamp: 2017-12-08T23:04:23Z
+    creationTimestamp: 2018-04-20T20:48:34Z
     name: reques-logger
     namespace: mem-tfrs-dev
-    resourceVersion: "283900340"
+    resourceVersion: "430937654"
     selfLink: /api/v1/namespaces/mem-tfrs-dev/configmaps/reques-logger
-    uid: 21a12d84-dc6c-11e7-9f70-005056832285
+    uid: 3140a737-44dc-11e8-af62-0050568379a2
 - apiVersion: v1
   data:
     filters.properties: "addport=6789\r\npass=pass123"
