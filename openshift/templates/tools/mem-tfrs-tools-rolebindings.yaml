@@ -7,7 +7,7 @@ items:
     creationTimestamp: 2017-11-21T23:45:47Z
     name: admin
     namespace: mem-tfrs-tools
-    resourceVersion: "355762976"
+    resourceVersion: "466379526"
     selfLink: /oapi/v1/namespaces/mem-tfrs-tools/rolebindings/admin
     uid: 1901bf80-cf16-11e7-8fdb-0050568348cc
   roleRef:
@@ -21,11 +21,14 @@ items:
     name: kuanfandevops
   - kind: User
     name: cvarjao
+  - kind: User
+    name: amichard
   userNames:
   - sheaphillips
   - rajpersram
   - kuanfandevops
   - cvarjao
+  - amichard
 - apiVersion: v1
   groupNames: null
   kind: RoleBinding
@@ -36,7 +39,7 @@ items:
       template: jenkins-persistent-template
     name: jenkins_edit
     namespace: mem-tfrs-tools
-    resourceVersion: "340070626"
+    resourceVersion: "466379529"
     selfLink: /oapi/v1/namespaces/mem-tfrs-tools/rolebindings/jenkins_edit
     uid: 18ecbc38-cf16-11e7-8fdb-0050568348cc
   roleRef:
@@ -48,15 +51,12 @@ items:
   - kind: User
     name: matthewhall78
   - kind: User
-    name: dainetrinidad
-  - kind: User
     name: rstens
   - kind: User
     name: DerekRoberts
   userNames:
   - system:serviceaccount:mem-tfrs-tools:jenkins
   - matthewhall78
-  - dainetrinidad
   - rstens
   - DerekRoberts
 - apiVersion: v1
@@ -66,7 +66,7 @@ items:
     creationTimestamp: 2017-11-21T23:45:47Z
     name: system:deployers
     namespace: mem-tfrs-tools
-    resourceVersion: "355762978"
+    resourceVersion: "466379530"
     selfLink: /oapi/v1/namespaces/mem-tfrs-tools/rolebindings/system%3Adeployers
     uid: 18ecccbc-cf16-11e7-8fdb-0050568348cc
   roleRef:
@@ -84,7 +84,7 @@ items:
     creationTimestamp: 2017-11-21T23:45:47Z
     name: system:image-builders
     namespace: mem-tfrs-tools
-    resourceVersion: "355762981"
+    resourceVersion: "466379534"
     selfLink: /oapi/v1/namespaces/mem-tfrs-tools/rolebindings/system%3Aimage-builders
     uid: 18ec6459-cf16-11e7-8fdb-0050568348cc
   roleRef:
@@ -103,7 +103,7 @@ items:
     creationTimestamp: 2017-11-21T23:45:47Z
     name: system:image-pullers
     namespace: mem-tfrs-tools
-    resourceVersion: "329992806"
+    resourceVersion: "466379537"
     selfLink: /oapi/v1/namespaces/mem-tfrs-tools/rolebindings/system%3Aimage-pullers
     uid: 18f56713-cf16-11e7-8fdb-0050568348cc
   roleRef:
@@ -143,7 +143,7 @@ items:
     creationTimestamp: 2017-11-21T23:45:47Z
     name: view
     namespace: mem-tfrs-tools
-    resourceVersion: "288498410"
+    resourceVersion: "466379541"
     selfLink: /oapi/v1/namespaces/mem-tfrs-tools/rolebindings/view
     uid: 1900e8a9-cf16-11e7-8fdb-0050568348cc
   roleRef:
