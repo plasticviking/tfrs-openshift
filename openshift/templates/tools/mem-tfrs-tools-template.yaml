@@ -47,14 +47,14 @@ objects:
   - kind: User
     name: matthewhall78
   - kind: User
-    name: rstens
-  - kind: User
     name: DerekRoberts
+  - kind: User
+    name: plasticviking
   userNames:
   - system:serviceaccount:mem-tfrs-tools:jenkins
   - matthewhall78
-  - rstens
   - DerekRoberts
+  - plasticviking
 - apiVersion: v1
   groupNames: null
   kind: RoleBinding
@@ -141,20 +141,19 @@ objects:
   kind: PersistentVolumeClaim
   metadata:
     annotations:
-      control-plane.alpha.kubernetes.io/leader: '{"holderIdentity":"d49aaa14-e506-11e7-bfd0-0a58ac332043","leaseDurationSeconds":15,"acquireTime":"2018-01-09T21:25:22Z","renewTime":"2018-01-09T21:25:26Z","leaderTransitions":0}'
       pv.kubernetes.io/bind-completed: "yes"
       pv.kubernetes.io/bound-by-controller: "yes"
-      volume.beta.kubernetes.io/storage-class: gluster-block
-      volume.beta.kubernetes.io/storage-provisioner: gluster.org/glusterblock
+      volume.beta.kubernetes.io/storage-class: gluster-file
+      volume.beta.kubernetes.io/storage-provisioner: kubernetes.io/glusterfs
     creationTimestamp: null
-    name: jenkins-cns
+    name: jenkins-backup
   spec:
     accessModes:
     - ReadWriteOnce
     resources:
       requests:
-        storage: 5Gi
-    volumeName: pvc-99698347-f583-11e7-9ace-0050568348cc
+        storage: 10Gi
+    volumeName: pvc-509e48f6-5869-11e8-ae7a-005056832285
   status: {}
 - apiVersion: v1
   kind: PersistentVolumeClaim
@@ -279,7 +278,7 @@ objects:
     source:
       contextDir: frontend
       git:
-        ref: master
+        ref: v0.3.1.3
         uri: https://github.com/bcgov/tfrs.git
       type: Git
     strategy:
@@ -365,7 +364,7 @@ objects:
     source:
       contextDir: frontend
       git:
-        ref: develop
+        ref: master
         uri: https://github.com/bcgov/tfrs.git
       type: Git
     strategy:
@@ -399,7 +398,7 @@ objects:
     runPolicy: Parallel
     source:
       git:
-        ref: develop
+        ref: master
         uri: https://github.com/bcgov/tfrs.git
       type: Git
     strategy:
@@ -459,7 +458,7 @@ objects:
     runPolicy: Parallel
     source:
       git:
-        ref: develop
+        ref: master
         uri: https://github.com/bcgov/tfrs.git
       type: Git
     strategy:
@@ -489,7 +488,7 @@ objects:
     runPolicy: Parallel
     source:
       git:
-        ref: master
+        ref: v0.3.1.3
         uri: https://github.com/bcgov/tfrs.git
       type: Git
     strategy:
@@ -519,7 +518,7 @@ objects:
     runPolicy: Parallel
     source:
       git:
-        ref: master
+        ref: v0.3.1.3
         uri: https://github.com/bcgov/tfrs.git
       type: Git
     strategy:
@@ -643,7 +642,7 @@ objects:
     source:
       contextDir: backend
       git:
-        ref: master
+        ref: v0.3.1.3
         uri: https://github.com/bcgov/tfrs.git
       type: Git
     strategy:
@@ -680,7 +679,7 @@ objects:
     source:
       contextDir: backend
       git:
-        ref: develop
+        ref: master
         uri: https://github.com/bcgov/tfrs.git
       type: Git
     strategy:
@@ -717,7 +716,7 @@ objects:
     source:
       contextDir: backend
       git:
-        ref: develop
+        ref: master
         uri: https://github.com/bcgov/tfrs.git
       type: Git
     strategy:
@@ -839,7 +838,7 @@ objects:
     runPolicy: Parallel
     source:
       git:
-        ref: develop
+        ref: master
         uri: https://github.com/bcgov/tfrs.git
       type: Git
     strategy:
@@ -856,15 +855,17 @@ objects:
   kind: DeploymentConfig
   metadata:
     annotations:
+      openshift.io/generated-by: OpenShiftNewApp
       template.alpha.openshift.io/wait-for-ready: "true"
     creationTimestamp: null
     generation: 1
     labels:
-      app: jenkins-pipeline
-      template: jenkins-persistent-template
+      app: jenkins-ephemeral
+      template: jenkins-ephemeral-template
     name: jenkins
   spec:
     replicas: 1
+    revisionHistoryLimit: 10
     selector:
       name: jenkins
     strategy:
@@ -875,6 +876,8 @@ objects:
       type: Recreate
     template:
       metadata:
+        annotations:
+          openshift.io/generated-by: OpenShiftNewApp
         creationTimestamp: null
         labels:
           name: jenkins
@@ -885,26 +888,54 @@ objects:
             value: "true"
           - name: OPENSHIFT_ENABLE_REDIRECT_PROMPT
             value: "true"
-          - name: OPENSHIFT_JENKINS_JVM_ARCH
-            value: x86_64
           - name: KUBERNETES_MASTER
             value: https://kubernetes.default:443
           - name: KUBERNETES_TRUST_CERTIFICATES
             value: "true"
+          - name: JENKINS_SERVICE_NAME
+            value: jenkins
           - name: JNLP_SERVICE_NAME
             value: jenkins-jnlp
+          - name: _OVERRIDE_PV_PLUGINS_WITH_IMAGE_PLUGINS
+            value: "true"
+          - name: OPENSHIFT_JENKINS_JVM_ARCH
+            value: x86_64
           - name: JAVA_OPTS
             value: -XX:MaxMetaspaceSize=512m -Dhudson.model.DirectoryBrowserSupport.CSP=
+          - name: _OVERRIDE_PV_CONFIG_WITH_IMAGE_CONFIG
+            value: "false"
+          - name: INSTALL_PLUGINS
+            value: embeddable-build-status:1.9
           image: registry.access.redhat.com/openshift3/jenkins-2-rhel7@sha256:9d9fd30f8cdf87c89b96e01e8b17786cd0643929b0621b719ab6b1353c8a5722
           imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 2
+            httpGet:
+              path: /login
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 420
+            periodSeconds: 360
+            successThreshold: 1
+            timeoutSeconds: 240
           name: jenkins
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /login
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 240
           resources:
             limits:
-              cpu: "2"
+              cpu: "3"
               memory: 6Gi
             requests:
               cpu: "1"
-              memory: 2Gi
+              memory: 1Gi
           securityContext:
             capabilities: {}
             privileged: false
@@ -932,8 +963,8 @@ objects:
         - jenkins
         from:
           kind: ImageStreamTag
-          name: jenkins:latest
-          namespace: openshift
+          name: jenkins-2-rhel7:v3.9
+          namespace: mem-tfrs-tools
       type: ImageChange
     - type: ConfigChange
   status:
@@ -1211,6 +1242,22 @@ objects:
   metadata:
     creationTimestamp: null
     labels:
+      gluster.kubernetes.io/provisioned-for-pvc: jenkins-backup
+    name: glusterfs-dynamic-jenkins-backup
+  spec:
+    ports:
+    - port: 1
+      protocol: TCP
+      targetPort: 1
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    labels:
       gluster.kubernetes.io/provisioned-for-pvc: jenkins-cns2
     name: glusterfs-dynamic-jenkins-cns2
   spec:
@@ -1258,13 +1305,14 @@ objects:
   kind: Service
   metadata:
     annotations:
+      openshift.io/generated-by: OpenShiftNewApp
       service.alpha.openshift.io/dependencies: '[{"name": "jenkins-jnlp", "namespace":
         "", "kind": "Service"}]'
       service.openshift.io/infrastructure: "true"
     creationTimestamp: null
     labels:
-      app: jenkins-pipeline
-      template: jenkins-persistent-template
+      app: jenkins-ephemeral
+      template: jenkins-ephemeral-template
     name: jenkins
   spec:
     ports:
@@ -1281,10 +1329,12 @@ objects:
 - apiVersion: v1
   kind: Service
   metadata:
+    annotations:
+      openshift.io/generated-by: OpenShiftNewApp
     creationTimestamp: null
     labels:
-      app: jenkins-pipeline
-      template: jenkins-persistent-template
+      app: jenkins-ephemeral
+      template: jenkins-ephemeral-template
     name: jenkins-jnlp
   spec:
     ports:
@@ -1406,40 +1456,14 @@ objects:
   kind: Route
   metadata:
     annotations:
+      haproxy.router.openshift.io/timeout: 4m
+      openshift.io/generated-by: OpenShiftNewApp
       openshift.io/host.generated: "true"
       template.openshift.io/expose-uri: http://{.spec.host}{.spec.path}
     creationTimestamp: null
     labels:
-      app: httpd-example
-      template: httpd-example
-    name: httpd-example
-  spec:
-    host: httpd-example-mem-tfrs-tools.pathfinder.gov.bc.ca
-    to:
-      kind: Service
-      name: httpd-example
-      weight: 100
-    wildcardPolicy: None
-  status:
-    ingress:
-    - conditions:
-      - lastTransitionTime: 2018-02-08T18:23:40Z
-        status: "True"
-        type: Admitted
-      host: httpd-example-mem-tfrs-tools.pathfinder.gov.bc.ca
-      routerName: router
-      wildcardPolicy: None
-- apiVersion: v1
-  kind: Route
-  metadata:
-    annotations:
-      haproxy.router.openshift.io/timeout: 180s
-      openshift.io/host.generated: "true"
-      template.openshift.io/expose-uri: http://{.spec.host}{.spec.path}
-    creationTimestamp: null
-    labels:
-      app: jenkins-pipeline
-      template: jenkins-persistent-template
+      app: jenkins-ephemeral
+      template: jenkins-ephemeral-template
     name: jenkins
   spec:
     host: jenkins-mem-tfrs-tools.pathfinder.gov.bc.ca
@@ -1454,7 +1478,7 @@ objects:
   status:
     ingress:
     - conditions:
-      - lastTransitionTime: 2017-10-27T22:29:05Z
+      - lastTransitionTime: 2018-05-15T19:33:00Z
         status: "True"
         type: Admitted
       host: jenkins-mem-tfrs-tools.pathfinder.gov.bc.ca

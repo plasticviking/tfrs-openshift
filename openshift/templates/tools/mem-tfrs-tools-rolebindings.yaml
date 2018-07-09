@@ -39,7 +39,7 @@ items:
       template: jenkins-persistent-template
     name: jenkins_edit
     namespace: mem-tfrs-tools
-    resourceVersion: "466379529"
+    resourceVersion: "473465324"
     selfLink: /oapi/v1/namespaces/mem-tfrs-tools/rolebindings/jenkins_edit
     uid: 18ecbc38-cf16-11e7-8fdb-0050568348cc
   roleRef:
@@ -51,14 +51,14 @@ items:
   - kind: User
     name: matthewhall78
   - kind: User
-    name: rstens
-  - kind: User
     name: DerekRoberts
+  - kind: User
+    name: plasticviking
   userNames:
   - system:serviceaccount:mem-tfrs-tools:jenkins
   - matthewhall78
-  - rstens
   - DerekRoberts
+  - plasticviking
 - apiVersion: v1
   groupNames: null
   kind: RoleBinding
